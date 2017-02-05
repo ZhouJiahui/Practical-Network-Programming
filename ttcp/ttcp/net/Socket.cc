@@ -46,6 +46,22 @@ Socket::~Socket()
   }
 }
 
+Socket::Socket(Socket &&rhs) : sockfd_(rhs.sockfd_)
+{
+  rhs.sockfd_=-1;
+}
+
+Socket& Socket::operator=(Socket &rhs)
+{
+  swap(rhs);
+  return *this;
+}
+
+void Socket::swap(Socket &rhs)
+{
+  std::swap(sockfd_,rhs.sockfd_);
+}
+
 void Socket::bindOrDie(const InetAddress& addr)
 {
   const struct sockaddr_in& saddr = addr.getSockAddrInet();

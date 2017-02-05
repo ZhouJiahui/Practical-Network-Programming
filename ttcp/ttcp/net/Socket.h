@@ -22,7 +22,6 @@ public:
   void listenOrDie();
   int connect(const InetAddress&);
   void shutdownWrite();
-  void close();
   void setReuseAddr(bool on);
   void setTcpNoDelay(bool on);
   int read(void*, int);

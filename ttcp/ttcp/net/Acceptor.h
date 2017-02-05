@@ -14,9 +14,9 @@ class Acceptor : noncopyable
 {
 public:
   explicit Acceptor(const InetAddress&);
-  ~Acceptor();
-//  Acceptor(Acceptor&&) = default;
-//  Acceptor& operator=(Acceptor&&) = default;
+  ~Acceptor() = default;
+  Acceptor(Acceptor&&) = default;
+  Acceptor& operator=(Acceptor&&) = default;
   TcpStreamPtr accept();
 
 private:

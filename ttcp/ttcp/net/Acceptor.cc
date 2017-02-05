@@ -12,11 +12,6 @@ Acceptor::Acceptor(const InetAddress &addr)
   listenSock_.listenOrDie();
 }
 
-Acceptor::~Acceptor()
-{
-  listenSock_.close();
-}
-
 TcpStreamPtr Acceptor::accept()
 {
   int sockfd = ::accept(listenSock_.fd(), NULL, NULL);

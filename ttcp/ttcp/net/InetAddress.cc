@@ -6,6 +6,12 @@
 #include <strings.h> // bzero
 #include <arpa/inet.h>
 
+InetAddress::InetAddress(std::string ip, uint16_t port)
+  : InetAddress(port, false)
+{
+//  ::inet_pton();
+}
+
 InetAddress::InetAddress(uint16_t port, bool loopbackOnly)
 {
   ::bzero(&saddr_, sizeof(saddr_));
