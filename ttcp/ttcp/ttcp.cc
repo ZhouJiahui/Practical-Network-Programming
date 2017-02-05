@@ -4,6 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/time.h>
+
+#include "net/Acceptor.h"
+#include "net/TcpStream.h"
+#include "net/InetAddress.h"
 
 typedef enum
 {
@@ -11,7 +16,7 @@ typedef enum
   kReceive,
   kTransmit,  
   kHelp
-}State;
+} State;
 
 struct SessionMessage
 {
@@ -33,6 +38,14 @@ struct Options
   std::string ip;
   int port;
 };
+
+
+double now()
+{
+  timeval tv = { 0, 0 };
+  gettimeofday(&tv, NULL);
+  return tv.tv_sec + tv.tv_usec / 1000000.0;
+}
 
 bool parseCommandLine(int argc, char **argv, Options  &options)
 {
@@ -112,10 +125,83 @@ void help()
 
 void transmit(const Options &options)
 {
+  InetAddress addr(options.port);
+  Acceptor acceptor(addr);
+  while (true)
+  {
+    TcpStreamPtr stream = acceptor.accept();
+    if (!stream)
+    {
+      continue;
+    }
+    SessionMessage sessionMsg = {0, 0};
+    int nread;
+    // read sessionMsg
+    nread = stream->receiveAll(&sessionMsg, sizeof sessionMsg);
+    assert( nread == sizeof sessionMsg);
+    sessionMsg.count = ntohl(sessionMsg.count);
+    sessionMsg.size = ntohl(sessionMsg.size);
+    printf("sessionMsg.count=%d  sessionMsg.size=%d\n",sessionMsg.count,sessionMsg.size);  
+    const int total_length = static_cast<int>(sizeof(int32_t) + sessionMsg.size);
+    PayLoadMessage *payLoadMsg = static_cast<PayLoadMessage*>(::malloc(total_length));
+    for(int i = 0; i < sessionMsg.count; ++i)
+    {
+      // read payLoadMsg length
+      payLoadMsg->length = 0;
+      nread = stream->receiveAll(&payLoadMsg->length, sizeof payLoadMsg->length);
+      assert(nread == sizeof payLoadMsg->length);
+      // read payLoadMsg data
+      payLoadMsg->length=ntohl(payLoadMsg->length);
+      nread = stream->receiveAll(&payLoadMsg->data, payLoadMsg->length);
+      assert(nread == payLoadMsg->length);
+      // write ack
+      int ack;
+      ack = static_cast<int>(sizeof (payLoadMsg->length) + payLoadMsg->length);
+      ack = htonl(ack);
+      int nwrite;
+      nwrite = stream->sendAll(&ack, sizeof ack);
+      assert(nwrite == sizeof ack);
+    }
+    ::free(payLoadMsg);
+  }
 }
 
 void receive(const Options &options)
 {
+  InetAddress serverAddr(options.ip, options.port);
+  TcpStreamPtr stream = TcpStream::connect(serverAddr);
+  // write sessionMsg
+  SessionMessage sessionMsg = {0, 0};
+  sessionMsg.count = htonl(options.count);
+  sessionMsg.size = htonl(options.size);
+  int nwrite;
+  nwrite = stream->sendAll(&sessionMsg,sizeof sessionMsg);
+  assert(nwrite == sizeof sessionMsg);
+  const int total_length = static_cast<int>(sizeof(int32_t) + options.size);
+  PayLoadMessage *payLoadMsg = static_cast<PayLoadMessage*>(::malloc(total_length));
+  payLoadMsg->length = htonl(options.size);
+  for(int i = 0; i < options.count; ++i)
+  {
+    payLoadMsg->data[i] = "1234567890ABCDEF"[i%16];
+  } 
+  double total_mb = options.count * options.count * 1.0 / 1024 / 1024;
+  printf("%.3f MiB in total\n", total_mb);
+  double start = now();  
+  for(int i = 0; i < options.count; ++i)
+  {
+    // write payLoadMsg
+    nwrite = stream->sendAll(payLoadMsg, total_length);
+    assert(nwrite == total_length);
+    // read ack
+    int ack;
+    int nread;
+    nread = stream->receiveAll(&ack, sizeof ack);
+    assert(nread == sizeof ack);
+    ack = ntohl(ack);
+    assert(ack == total_length);
+  }
+  double elapsed = (now() - start) / 1000000.0;
+  printf("%.3lf seconds\n%.3lf MiB/s.\n", elapsed, total_mb / elapsed);
 }
 
 int main(int argc, char **argv)
