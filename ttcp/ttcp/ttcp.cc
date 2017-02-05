@@ -187,11 +187,11 @@ void transmit(const Options &options)
   const int total_length = static_cast<int>(sizeof(int32_t) + options.size);
   PayLoadMessage *payLoadMsg = static_cast<PayLoadMessage*>(::malloc(total_length));
   payLoadMsg->length = htonl(options.size);
-  for(int i = 0; i < options.count; ++i)
+  for(int i = 0; i < options.size; ++i)
   {
     payLoadMsg->data[i] = "1234567890ABCDEF"[i%16];
   } 
-  double total_mb = 1.0 * options.count * options.count / 1024 / 1024;
+  double total_mb = 1.0 * options.count * options.size / 1024 / 1024;
   printf("%.3f MiB in total\n", total_mb);
   double start = now();  
   for(int i = 0; i < options.count; ++i)
