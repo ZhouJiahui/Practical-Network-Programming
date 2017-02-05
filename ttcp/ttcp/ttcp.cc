@@ -123,15 +123,16 @@ void help()
   printf("  -s=8196       size\n");
 }
 
-void transmit(const Options &options)
+void receive(const Options &options)
 {
   InetAddress addr(options.port);
   Acceptor acceptor(addr);
   while (true)
   {
     TcpStreamPtr stream = acceptor.accept();
-    if (!stream)
+    if (!stream.get())
     {
+      printf("accept error.\n");
       continue;
     }
     SessionMessage sessionMsg = {0, 0};
@@ -141,7 +142,7 @@ void transmit(const Options &options)
     assert( nread == sizeof sessionMsg);
     sessionMsg.count = ntohl(sessionMsg.count);
     sessionMsg.size = ntohl(sessionMsg.size);
-    printf("sessionMsg.count=%d  sessionMsg.size=%d\n",sessionMsg.count,sessionMsg.size);  
+    printf("read from the other: sessionMsg.count=%d  sessionMsg.size=%d\n", sessionMsg.count, sessionMsg.size);  
     const int total_length = static_cast<int>(sizeof(int32_t) + sessionMsg.size);
     PayLoadMessage *payLoadMsg = static_cast<PayLoadMessage*>(::malloc(total_length));
     for(int i = 0; i < sessionMsg.count; ++i)
@@ -166,10 +167,16 @@ void transmit(const Options &options)
   }
 }
 
-void receive(const Options &options)
+void transmit(const Options &options)
 {
   InetAddress serverAddr(options.ip, options.port);
   TcpStreamPtr stream = TcpStream::connect(serverAddr);
+  if (!stream.get())
+  {
+    printf("connect error.\n");
+    return;
+  }
+  printf("send to the other: sessionMsg.count=%d  sessionMsg.size=%d\n", options.count, options.size);  
   // write sessionMsg
   SessionMessage sessionMsg = {0, 0};
   sessionMsg.count = htonl(options.count);
@@ -184,7 +191,7 @@ void receive(const Options &options)
   {
     payLoadMsg->data[i] = "1234567890ABCDEF"[i%16];
   } 
-  double total_mb = options.count * options.count * 1.0 / 1024 / 1024;
+  double total_mb = 1.0 * options.count * options.count / 1024 / 1024;
   printf("%.3f MiB in total\n", total_mb);
   double start = now();  
   for(int i = 0; i < options.count; ++i)
@@ -200,7 +207,7 @@ void receive(const Options &options)
     ack = ntohl(ack);
     assert(ack == total_length);
   }
-  double elapsed = (now() - start) / 1000000.0;
+  double elapsed = (now() - start);
   printf("%.3lf seconds\n%.3lf MiB/s.\n", elapsed, total_mb / elapsed);
 }
 
